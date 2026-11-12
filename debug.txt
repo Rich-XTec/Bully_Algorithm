@@ -1,0 +1,5 @@
+DEBUG lineno(47): priority 5 has port 9377
+DEBUG lineno(47): priority 4 has port 9376
+DEBUG lineno(47): priority 2 has port 9374
+DEBUG lineno(47): priority 3 has port 9375
+DEBUG lineno(47): priority 1 has port 9373

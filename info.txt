@@ -1,0 +1,34 @@
+Algorithm flow-
+num_of_processes and detector_process taken as input from the command line
+processes created with decreasing process IDs starting from num_of_processes to 1, process IDs are the process priorities itself (highest ID corresponds to highest priority)
+process with highest priority is always the coordinator
+coordinator process prints "coordinator:<process_ID/priority>" to terminal immediately after it knows it is the coordinator
+every process does the work of printing a message "work:<process_ID/priority>" to the terminal with some time interval in a loop
+the detector sends heartbeat messages "heartbeat:<process_ID/priority>" within regular time intervals to the coordinator, expects response from the coordinator within a specific timeout period, the coordinator responds with an ack message "ack:<process_ID/priority>"
+after a certain period of time the detector hits timeout on the heartbeat message since the coordinator stops printing its work message, which simulates its failure, it prints a message "failed:<process_ID/priority>" and then sleeps for a long time
+the detector then begins the election by sending election messages "election:<process_ID/priority>" to all processes having priority higher than it and then waits for at least one of them to respond within a certain timeout period with an alive message "alive:<process_ID/priority>", if it does receive at least one alive message, it then waits for any of the processes with higher priorities that its priority to send it a coordinator message "coordinator:<process_ID/priority>" within a specific timeout period,though if it does not receive even one alive message and times out, then it sends a coordinator message to all processes with lesser priorities than its priority
+when the process with current highest priority receives an election message from the detector, it sends a coordinator message to all processes with priorities lesser than its priority, if the detector is itself this process, it skips the previous step and directly sends a coordinator message to all processes with priorities lesser than its priority
+after the long sleep, the previously failed coordinator comes alive, prints a message "recovered:<process_ID/priority>", again prints "coordinator:<process_ID/priority>" and then sends the coordinator message to all processes with priorities lesser than its priority
+all processes then continue printing their work messages until a certain time is reached
+
+Shared variable among all processes-
+coordinator_id
+detector_id
+ip_addresses_ports
+lport_priority_links (this links the remote ports chosen by a process while establishing connections with all other processes with their priorities)
+
+Example-
+num_of_processes = 5
+detector_process = 2
+process IDs/priorities = 5, 4, 3, 2, 1
+coordinator:5
+multiple "work:<priority>" messages
+failed:5
+coordinator:4
+multiple "work:<priority>" messages
+recovered:5
+coordinator:5
+multiple "work:<priority>" messages
+
+Execution command-
+python3 bully.py -numproc <num_of_processes> -detectproc <detector_process>

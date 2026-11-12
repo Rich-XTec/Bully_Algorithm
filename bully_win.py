@@ -31,7 +31,7 @@ def bind_and_listen_skt(skt, ip_address_and_port, max_num_connections):
     skt.bind(ip_address_and_port)
     skt.listen(max_num_connections)
 
-def setup_skt(ip_address_and_port, mode):
+def setup_skt(ip_address_and_port, mode, shared_vars):
     skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     if mode == 's':
         bind_and_listen_skt(skt, ip_address_and_port, len(shared_vars['ip_addresses_ports']) - 1)
@@ -50,7 +50,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
     count = 0
     coordinator = True
     timeout = False
-    s_skt = setup_skt(('', shared_vars['ip_addresses_ports'][priority][1]), 's')
+    s_skt = setup_skt(('', shared_vars['ip_addresses_ports'][priority][1]), 's', shared_vars)
     print('DEBUG lineno(' + str(getframeinfo(currentframe()).lineno) + '): s_skt set by priority ' + \
         str(priority) + ' to ' + str(shared_vars['ip_addresses_ports'][priority][1]) + '\n', \
         end='', flush=True, file=debug_file)
@@ -59,7 +59,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
     temp_shared_vars = shared_vars['lport_priority_links']
     for iterator in [iterator for iterator in range(1, len(shared_vars['ip_addresses_ports']) + 1) if iterator != priority]:
         c_skts[iterator] = setup_skt((shared_vars['ip_addresses_ports'][iterator][0], \
-            shared_vars['ip_addresses_ports'][iterator][1]), 'c')
+            shared_vars['ip_addresses_ports'][iterator][1]), 'c', shared_vars)
         # shared_vars['lport_priority_links'][iterator] = {}
         # print(str(shared_vars['lport_priority_links'][iterator]))
         # shared_vars['lport_priority_links'][iterator][c_skts[iterator].getsockname()[1]] = priority

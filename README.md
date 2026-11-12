@@ -1,137 +1,118 @@
-# Trabalho Pr·tico de Sistemas DistribuÌdos: Algoritmo de Bully e Cliente-Servidor
+# Trabalho Pr√°tico de Sistemas Distribu√≠dos: Algoritmo de Bully e Cliente-Servidor
 
 ## 1. Proposta do Trabalho
-Este trabalho consiste na implementaÁ„o de um sistema distribuÌdo baseado na arquitetura **Cliente-Servidor**, utilizando o **Algoritmo de Bully** para **EleiÁ„o de LÌder**. 
-O sistema È composto por m˙ltiplos processos servidores (nÛs) e um cliente. O cliente envia requisiÁıes de serviÁo para o sistema. Caso o servidor lÌder (coordenador) falhe, os nÛs restantes detectam a falha e iniciam o algoritmo de Bully para eleger um novo lÌder com base no maior n˙mero de identificaÁ„o (ID) de processo, garantindo a disponibilidade do serviÁo.
+Este trabalho consiste na implementa√ß√£o de um sistema distribu√≠do baseado na arquitetura **Cliente-Servidor**, utilizando o **Algoritmo de Bully** para **Elei√ß√£o de L√≠der**. 
+
+O sistema √© composto por m√∫ltiplos processos servidores (n√≥s criados via `multiprocessing`) e um cliente externo. O cliente envia requisi√ß√µes de servi√ßo para o sistema. Caso o servidor l√≠der (coordenador) falhe, os n√≥s restantes detectam a falha por meio de *timeouts* de *heartbeats* e iniciam o algoritmo de Bully para eleger um novo l√≠der com base no maior n√∫mero de identifica√ß√£o (ID/Prioridade) do processo, garantindo a disponibilidade do servi√ßo.
 
 ## 2. Requisitos Funcionais
 
-*   **IdentificaÁ„o dos Processos:** Cada servidor rodando na m·quina recebe um ID ˙nico (ex: 1, 2, 3, 4, 5) e uma porta TCP correspondente (ex: 5001, 5002, etc.). O nÛ com o maior ID sempre ser· o lÌder natural.
-*   **Servidor:** 
-    *   Deve escutar conexıes de clientes e de outros servidores.
-    *   Deve responder a mensagens de eleiÁ„o (`ELECTION`), responder que est· vivo (`ALIVE`) e declarar vitÛria (`COORDINATOR`).
-    *   O servidor que atua como lÌder processa a requisiÁ„o do cliente.
+*   **Identifica√ß√£o dos Processos:** Cada servidor rodando na m√°quina recebe um ID √∫nico (ex: 1, 2, 3, 4, 5) que tamb√©m serve como sua prioridade. Uma porta TCP correspondente √© designada a cada n√≥. O n√≥ com o maior ID sempre ser√° o l√≠der (coordenador).
+*   **Servidor (N√≥s):** 
+    *   Comunica-se com outros n√≥s para o algoritmo de elei√ß√£o atrav√©s de portas base (trocando mensagens como `ELECTION`, `ALIVE`, `COORDINATOR`, `HEARTBEAT` e `ACK`).
+    *   Possui uma *Thread* secund√°ria dedicada exclusivamente a escutar conex√µes de clientes em uma porta separada (Porta Base + 10000).
+    *   Apenas o servidor que atua como l√≠der processa a requisi√ß√£o do cliente. Se um n√≥ n√£o-l√≠der for contatado, ele rejeita o pedido e informa o ID do l√≠der atual.
 *   **Cliente:**
-    *   O tipo de requisiÁ„o enviada È uma string de comando (ex: `GET_TIME` ou `STATUS`).
-    *   Se o cliente tentar se conectar a um servidor que caiu, ele tenta o prÛximo atÈ encontrar o novo lÌder.
+    *   O tipo de requisi√ß√£o enviada √© uma string de comando (ex: `SERVICE_REQUEST`).
+    *   Se o cliente tentar se conectar a um servidor que n√£o √© o l√≠der, ele recebe o ID do l√≠der e redireciona a requisi√ß√£o automaticamente.
 
-## 3. ComunicaÁ„o entre Cliente e Servidor
-A comunicaÁ„o È feita via **Sockets TCP**, garantindo a entrega confi·vel das mensagens. As mensagens trafegadas s„o strings codificadas em UTF-8. 
-Quando o cliente faz uma requisiÁ„o, ele abre uma conex„o socket com o lÌder, envia o comando, aguarda o processamento, recebe a resposta e encerra a conex„o.
+## 3. Comunica√ß√£o entre Cliente e Servidor
+A comunica√ß√£o √© feita via **Sockets TCP**, garantindo a entrega confi√°vel das mensagens. As mensagens trafegadas s√£o strings codificadas em UTF-8. 
 
-
-## Como testar tudo junto:
-
-### Abra um terminal e inicie os servidores (nÛs) do projeto original:
-
-Bash
-python3 bully.py -numproc 5 -detectproc 2
-
-(Observe o arquivo debug.txt gerado. L· vai aparecer as portas que ele escolheu, por exemplo: priority 1 has port 9561. Isso significa que a porta de cliente do nÛ 1 ser· 19561).
-
-Abra um SEGUNDO terminal na mesma pasta.
-
-Rode o cliente:
-
-Bash
-python3 client.py
-
-Ele vai pedir uma porta. Digite a porta cliente de um dos nÛs que N√O È o lÌder (ex: o lÌder È o 5, ent„o digite a porta cliente correspondente ao ID 1 ou 2).
-
-VocÍ ver· a m·gica acontecer: O nÛ vai recusar o processamento, avisar o cliente que o lÌder È o ID 5, o cliente vai redirecionar a conex„o automaticamente para a porta do ID 5 e receber· a hora do sistema processada pelo LÌder!
-
-
-### Diagrama de SequÍncia (EleiÁ„o e RequisiÁ„o)
-*O GitHub renderiza o cÛdigo Mermaid abaixo automaticamente como uma imagem no repositÛrio.*
+### Diagrama de Sequ√™ncia (Requisi√ß√£o e Redirecionamento)
+Abaixo, o fluxo de comunica√ß√£o quando o cliente tenta acessar um n√≥ comum, descobre quem √© o l√≠der e refaz a requisi√ß√£o.
 
 ```mermaid
 sequenceDiagram
     participant C as Cliente
-    participant S1 as Servidor (ID 1)
-    participant S2 as Servidor (ID 2)
-    participant S3 as Servidor (ID 3 - LÌder Morto)
+    participant S2 as Servidor (ID 2 - N√≥ Comum)
+    participant S5 as Servidor (ID 5 - L√≠der)
 
-    Note over S1, S3: S3 era o lÌder, mas caiu.
-    S1->>S2: Envia ELECTION (ID 1)
-    S1->>S3: Envia ELECTION (ID 1)
-    Note over S3: Sem resposta (Timeout)
-    S2->>S1: Responde ALIVE (ID 2 È maior)
-    S2->>S3: Envia ELECTION (ID 2)
-    Note over S3: Sem resposta (Timeout)
-    S2->>S1: Envia COORDINATOR (S2 agora È o lÌder)
+    Note over C, S5: O cliente tenta conectar em um n√≥ qualquer
+    C->>S2: Conecta e envia "SERVICE_REQUEST"
+    S2->>C: Responde "NOT_LEADER:5"
+    Note over C: Cliente redireciona a conex√£o automaticamente
+    C->>S5: Conecta e envia "SERVICE_REQUEST"
+    S5->>C: Responde "SUCESSO: Servi√ßo processado as 14:30:00"
+```
+
+## 4. Guia de Execu√ß√£o (Ambiente Linux)
+
+O sistema foi desenhado para rodar nativamente em ambientes Linux utilizando o terminal.
+
+**Passo 1: Iniciar os n√≥s do Servidor**
+Abra o seu terminal (geralmente `Ctrl + Alt + T` no Ubuntu/Mint) e execute o script principal informando o n√∫mero de processos e qual n√≥ iniciar√° como detector:
+```bash
+python3 bully.py -numproc 5 -detectproc 2
+```
+*Isso criar√° 5 processos (IDs de 1 a 5) rodando em background no mesmo terminal.*
+
+**Passo 2: Identificar a porta de um N√≥**
+O servidor gera portas aleat√≥rias e salva o registro no arquivo `debug.txt`. Abra uma **nova aba no terminal** (`Ctrl + Shift + T`) e use o comando `cat` com `grep` para ver as portas:
+```bash
+cat debug.txt | grep port
+```
+Voc√™ ver√° uma sa√≠da similar a: `priority 1 has port 16975`.
+*Nota: A porta de comunica√ß√£o para o CLIENTE ser√° essa porta do log somada a 10000 (ex: se a porta do n√≥ 1 for 16975, a porta cliente ser√° `26975`).*
+
+**Passo 3: Executar o Cliente**
+Na mesma nova aba de terminal, execute o cliente:
+```bash
+python3 client.py
+```
+O prompt pedir√° a porta. Digite a porta cliente (ex: `26975`) de um n√≥ que **n√£o seja** o ID 5. Voc√™ ver√° o terminal mostrar o cliente conectando no n√≥, recebendo o aviso de que n√£o √© o l√≠der, e redirecionando perfeitamente para o l√≠der (ID 5).
+
+## 5. Trechos de C√≥digo Relevantes
+
+Abaixo est√£o blocos do c√≥digo desenvolvido que demonstram os principais conceitos aplicados na implementa√ß√£o:
+
+**Cria√ß√£o dos Processos e Defini√ß√£o de IDs/Prioridade (multiprocessing):**
+```python
+# Inicializando os n√≥s com IDs correspondentes √† sua prioridade
+for process_id in range(num_of_processes, 0, -1):
+    if process_id == detector_process:
+        process = Process(target=run_proc, args=(process_id, shared_vars, lock, True))
+    else:
+        process = Process(target=run_proc, args=(process_id, shared_vars, lock, False))
+    jobs.append(process)
+    process.start()
+```
+
+**Escuta do Servidor para o Cliente (Thread separada com Sockets):**
+```python
+def client_listener(priority, shared_vars, client_port):
+    c_skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    c_skt.bind(('', client_port))
+    c_skt.listen(5)
     
-    Note over C: Cliente faz requisiÁ„o ao novo lÌder
-    C->>S2: Conecta e envia "GET_TIME"
-    S2->>C: Responde "14:30:00"
-
-
-
-4. DescriÁ„o do ServiÁo e ExecuÁ„o
-O serviÁo implementado È um simples "Servidor de Hora/Status". O lÌder eleito È o ˙nico autorizado a responder ‡s requisiÁıes do cliente.
-
-Como executar o projeto localmente (em terminais separados):
-
-Inicie o servidor 1: python server.py --id 1 --port 5001
-
-Inicie o servidor 2: python server.py --id 2 --port 5002
-
-Inicie o servidor 3 (LÌder inicial): python server.py --id 3 --port 5003
-
-Inicie o cliente: python client.py
-
-Derrube o servidor 3 (Ctrl+C) para observar o Algoritmo de Bully acontecendo entre 1 e 2.
-
-5. Trechos de CÛdigo Relevantes
-Conforme exigido, abaixo est„o os blocos de cÛdigo demonstrando os principais conceitos de comunicaÁ„o em rede utilizando Python socket.
-
-DefiniÁ„o da IdentificaÁ„o do Processo:
-
-Python
-# A identificaÁ„o do processo È passada via argumento de linha de comando
-import argparse
-
-parser = argparse.ArgumentParser()
-parser.add_argument('--id', type=int, required=True, help="ID ˙nico do processo")
-parser.add_argument('--port', type=int, required=True, help="Porta TCP do servidor")
-args = parser.parse_args()
-
-MEU_ID = args.id
-MINHA_PORTA = args.port
-RecepÁ„o de Mensagens no Servidor (Escuta):
-
-Python
-import socket
-
-def iniciar_servidor():
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind(('localhost', MINHA_PORTA))
-    server_socket.listen(5)
-    print(f"Servidor [ID: {MEU_ID}] escutando na porta {MINHA_PORTA}...")
-
     while True:
-        client_conn, addr = server_socket.accept()
-        mensagem_recebida = client_conn.recv(1024).decode('utf-8')
+        conn, addr = c_skt.accept()
+        req = conn.recv(1024).decode('utf-8')
         
-        if mensagem_recebida == "ELECTION":
-            # LÛgica do Bully...
-            client_conn.sendall("ALIVE".encode('utf-8'))
-        elif mensagem_recebida == "GET_TIME":
-            # LÛgica de serviÁo para o cliente
-            client_conn.sendall("ServiÁo processado pelo LÌder!".encode('utf-8'))
-        
-        client_conn.close()
-Envio de Mensagens (ComunicaÁ„o Cliente -> Servidor ou Servidor -> Servidor):
+        if req == "SERVICE_REQUEST":
+            if shared_vars['coordinator_id'] == priority:
+                agora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                resposta = f"SUCESSO: Servi√ßo processado pelo L√≠der (ID: {priority}) as {agora}"
+                conn.sendall(resposta.encode('utf-8'))
+            else:
+                lider_atual = shared_vars['coordinator_id']
+                conn.sendall(f"NOT_LEADER:{lider_atual}".encode('utf-8'))
+        conn.close()
+```
 
-Python
-def enviar_mensagem(porta_destino, mensagem):
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(2.0) # Timeout para detectar se o nÛ caiu
-        s.connect(('localhost', porta_destino))
-        s.sendall(mensagem.encode('utf-8'))
-        
-        resposta = s.recv(1024).decode('utf-8')
-        s.close()
-        return resposta
-    except (socket.timeout, ConnectionRefusedError):
-        return None # Indica que o processo na porta_destino est· morto
+**L√≥gica do Cliente (Tratamento e Redirecionamento TCP):**
+```python
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(('127.0.0.1', target_port))
+s.sendall("SERVICE_REQUEST".encode('utf-8'))
+resp = s.recv(1024).decode('utf-8')
+
+if resp.startswith("SUCESSO"):
+    print(f"[+] Resposta do Servidor: {resp}")
+elif resp.startswith("NOT_LEADER"):
+    leader_id = int(resp.split(":")[1])
+    print(f"[-] N√≥ n√£o √© o l√≠der. O l√≠der atual √© o ID {leader_id}.")
+    print(f"[*] Redirecionando para o l√≠der...")
+    # C√°lculo para pular para a porta do l√≠der usando a base
+    target_port = target_port - (target_port % 10) + leader_id 
+```

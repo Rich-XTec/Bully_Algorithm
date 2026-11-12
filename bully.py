@@ -135,6 +135,8 @@ def run_proc(priority, shared_vars, lock, is_detector):
     # Inicia a thread que fica rodando em paralelo ao Bully
     t = threading.Thread(target=client_listener, args=(priority, shared_vars, client_port), daemon=True)
     t.start()
+
+    print(f"[*] Processo do Nó ID {priority} rodando. Aguardando eventos...")
     # ----------------- FIM DO CÓDIGO DO SERVIÇO -----------------
 
     while True:
@@ -484,6 +486,14 @@ if __name__ == '__main__':
     ip_addresses_ports = {}
     for iterator in range(1, num_of_processes + 1):
         ip_addresses_ports[iterator] = ('127.0.0.1', base_port + iterator)
+
+    print("\n" + "="*55)
+    print("INICIALIZANDO SERVIDORES (ALGORITMO DE BULLY)")
+    print("="*55)
+    for p_id, (ip, port) in ip_addresses_ports.items():
+        porta_cliente = port + 10000
+        print(f"Nó ID {p_id} | Porta Interna: {port} | Porta CLIENTE: {porta_cliente}")
+    print("="*55 + "\n")
 
     manager = Manager()
     lock = manager.Lock()

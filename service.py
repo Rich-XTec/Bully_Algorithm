@@ -20,9 +20,12 @@ def client_listener(priority, shared_vars, client_port):
                         resposta = f"SUCESSO: Serviço processado pelo Líder (ID: {priority}) as {agora}"
                         conn.sendall(resposta.encode('utf-8'))
                     else:
-                        # Se não for o líder, avisa o cliente quem é o líder atual
                         lider_atual = shared_vars['coordinator_id']
-                        resposta = f"NOT_LEADER:{lider_atual}"
+                        # Pega a porta interna do líder e soma 10000 para achar a porta de cliente dele
+                        porta_lider = shared_vars['ip_addresses_ports'][lider_atual][1] + 10000
+                    
+                        # Agora envia o ID e a PORTA do líder
+                        resposta = f"NOT_LEADER:{lider_atual}:{porta_lider}"
                         conn.sendall(resposta.encode('utf-8'))
                 conn.close()
             except Exception:

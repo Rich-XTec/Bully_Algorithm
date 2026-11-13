@@ -28,14 +28,15 @@ def request_service():
                 print(f"\n[+] Resposta do Servidor: {resp}\n")
                 break
             elif resp.startswith("NOT_LEADER"):
-                leader_id = int(resp.split(":")[1])
-                print(f"[-] O nó conectado não é o líder. O líder atual é o ID {leader_id}.")
-                print(f"[*] Redirecionando para o líder...")
+                partes = resp.split(":")
+                leader_id = int(partes[1])
+                porta_lider = int(partes[2]) # Lê a porta exata enviada pelo servidor
                 
-                # Calcula a porta do líder (A porta inicial é a base + ID)
-                # Subtraímos o ID atual para achar a base, e somamos o leader_id
-                # (Isso é uma matemática simples para achar a porta exata do líder)
-                target_port = target_port - (target_port % 10) + leader_id
+                print(f"[-] O nó conectado não é o líder. O líder atual é o ID {leader_id}.")
+                print(f"[*] Redirecionando para o líder na porta {porta_lider}...")
+                
+                # Atualiza a porta alvo com a informação exata recebida
+                target_port = porta_lider
                 time.sleep(1)
                 
         except ConnectionRefusedError:

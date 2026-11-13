@@ -33,7 +33,7 @@ def request_service():
                 porta_lider = int(partes[2]) # Lê a porta exata enviada pelo servidor
                 
                 print(f"[-] O nó conectado não é o líder. O líder atual é o ID {leader_id}.")
-                print(f"[*] Redirecionando para o líder na porta {porta_lider}...")
+                print(f"[*] Redirecionando para o líder na porta {porta_lider}.")
                 
                 # Atualiza a porta alvo com a informação exata recebida
                 target_port = porta_lider

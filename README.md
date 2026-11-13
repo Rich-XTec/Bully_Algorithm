@@ -43,7 +43,7 @@ O sistema foi desenhado para rodar nativamente em ambientes Linux utilizando o t
 **Passo 1: Iniciar os nós do Servidor**
 Abra o seu terminal (geralmente `Ctrl + Alt + T` no Ubuntu/Mint) e execute o script principal informando o número de processos e qual nó iniciará como detector:
 ```bash
-python3 bully.py -numproc 5 -detectproc 2
+python3 main.py -numproc 5 -detectproc 2
 ```
 *Isso criará 5 processos (IDs de 1 a 5) rodando em background no mesmo terminal.*
 
@@ -110,9 +110,13 @@ resp = s.recv(1024).decode('utf-8')
 if resp.startswith("SUCESSO"):
     print(f"[+] Resposta do Servidor: {resp}")
 elif resp.startswith("NOT_LEADER"):
-    leader_id = int(resp.split(":")[1])
-    print(f"[-] Nó não é o líder. O líder atual é o ID {leader_id}.")
-    print(f"[*] Redirecionando para o líder...")
-    # Cálculo para pular para a porta do líder usando a base
-    target_port = target_port - (target_port % 10) + leader_id 
+    partes = resp.split(":")
+    leader_id = int(partes[1])
+    porta_lider = int(partes[2]) # Lê a porta exata enviada pelo servidor
+                
+    print(f"[-] O nó conectado não é o líder. O líder atual é o ID {leader_id}.")
+    print(f"[*] Redirecionando para o líder na porta {porta_lider}.")
+                
+    # Atualiza a porta alvo com a informação exata recebida
+    target_port = porta_lider
 ```

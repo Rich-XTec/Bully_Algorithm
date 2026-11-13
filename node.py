@@ -4,7 +4,6 @@ import socket
 import threading
 from inspect import currentframe, getframeinfo
 
-# Importando os nossos módulos separados
 from network import setup_skt
 from service import client_listener
 

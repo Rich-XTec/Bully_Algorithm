@@ -1,62 +1,44 @@
-import argparse
 import sys
 import time
 import socket
-import random
 import threading
-import datetime
-from multiprocessing import Process, Manager
 from inspect import currentframe, getframeinfo
 
-def setup_argument_parser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--num-of-processes', '-numproc', type=int, required=True, \
-        help='pass the required number of processes')
-    parser.add_argument('--detector-process', '-detectproc', type=int, required=True, \
-        help='pass the process ID/priority which will detect initial coordinator failure')
-    return parser.parse_args()
+# Importando os nossos módulos separados
+from network import setup_skt
+from service import client_listener
 
-def connect_skt(skt, ip_address_and_port):
-  while True:
-        try:
-            skt.connect(ip_address_and_port)
-            break
-        except ConnectionRefusedError:
-            pass
-
-def bind_and_listen_skt(skt, ip_address_and_port, max_num_connections):
-    skt.bind(ip_address_and_port)
-    skt.listen(max_num_connections)
-
-def setup_skt(ip_address_and_port, mode):
-    skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    if mode == 's':
-        bind_and_listen_skt(skt, ip_address_and_port, len(shared_vars['ip_addresses_ports']) - 1)
-    elif mode == 'c':
-        connect_skt(skt, ip_address_and_port)
-    else:
-        print('ERROR: Correct mode not provided while calling setup_skt(), should be s/c\n', \
-            end='', flush=True, file=debug_file)
-        sys.exit(0)
-    return skt
 
 def run_proc(priority, shared_vars, lock, is_detector):
-    print('DEBUG lineno(' + str(getframeinfo(currentframe()).lineno) + '): priority ' + \
-        str(priority) + ' has port ' + str(shared_vars['ip_addresses_ports'][priority][1]) + '\n', \
-        end='', flush=True, file=debug_file)
+    # Arquivos de log precisam ser abertos no processo para não dar conflito
+    debug_file = open('debug.txt', 'a')
+    output_file = open('output.txt', 'a')
+
     count = 0
     coordinator = True
     timeout = False
-    s_skt = setup_skt(('', shared_vars['ip_addresses_ports'][priority][1]), 's')
+    
+    num_connections = len(shared_vars['ip_addresses_ports']) - 1
+
+    print('DEBUG lineno(' + str(getframeinfo(currentframe()).lineno) + '): priority ' + \
+        str(priority) + ' has port ' + str(shared_vars['ip_addresses_ports'][priority][1]) + '\n', \
+        end='', flush=True, file=debug_file)
+
+
+    s_skt = setup_skt(('', shared_vars['ip_addresses_ports'][priority][1]), 's', num_connections, debug_file)
+
     print('DEBUG lineno(' + str(getframeinfo(currentframe()).lineno) + '): s_skt set by priority ' + \
         str(priority) + ' to ' + str(shared_vars['ip_addresses_ports'][priority][1]) + '\n', \
         end='', flush=True, file=debug_file)
+    
     c_skts = {}
     lock.acquire()
+
     temp_shared_vars = shared_vars['lport_priority_links']
     for iterator in [iterator for iterator in range(1, len(shared_vars['ip_addresses_ports']) + 1) if iterator != priority]:
         c_skts[iterator] = setup_skt((shared_vars['ip_addresses_ports'][iterator][0], \
-            shared_vars['ip_addresses_ports'][iterator][1]), 'c')
+            shared_vars['ip_addresses_ports'][iterator][1]), 'c', shared_vars)
+        
         # shared_vars['lport_priority_links'][iterator] = {}
         # print(str(shared_vars['lport_priority_links'][iterator]))
         # shared_vars['lport_priority_links'][iterator][c_skts[iterator].getsockname()[1]] = priority
@@ -73,6 +55,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
 
         # using a temp_shared_vars by assigning shared_vars['lport_priority_links'] to it, append to it 
         # and then reassign it to shared_vars['lport_priority_links']
+
         temp_shared_vars.append(str(iterator) + ':' + str(c_skts[iterator].getsockname()[1]) + ':' + str(priority))
     shared_vars['lport_priority_links'] = temp_shared_vars
     lock.release()
@@ -101,34 +84,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
         str(priority) + ' from priorities ' + str(connection_accepts) + '\n', \
         end='', flush=True, file=debug_file)
     
-    # ----------------- INÍCIO DO CÓDIGO DO SERVIÇO (CLIENTE-SERVIDOR) -----------------
-    def client_listener(priority, shared_vars, client_port):
-        # Cria um socket para escutar apenas os clientes
-        c_skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        c_skt.bind(('', client_port))
-        c_skt.listen(5)
-        
-        while True:
-            try:
-                conn, addr = c_skt.accept()
-                req = conn.recv(1024).decode('utf-8')
-                
-                if req == "SERVICE_REQUEST":
-                    # Verifica se este processo é o Coordenador atual
-                    if shared_vars['coordinator_id'] == priority:
-                        # O SERVIÇO: Retornar a data/hora e confirmar quem processou
-                        agora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        resposta = f"SUCESSO: Serviço processado pelo Líder (ID: {priority}) as {agora}"
-                        conn.sendall(resposta.encode('utf-8'))
-                    else:
-                        # Se não for o líder, avisa o cliente quem é o líder atual
-                        lider_atual = shared_vars['coordinator_id']
-                        resposta = f"NOT_LEADER:{lider_atual}"
-                        conn.sendall(resposta.encode('utf-8'))
-                conn.close()
-            except Exception:
-                pass
-
+    # -- INICIALIZA O SERVIÇO CLIENTE --
     # A porta do cliente será a porta interna + 10000 para não dar conflito
     client_port = shared_vars['ip_addresses_ports'][priority][1] + 10000
     
@@ -137,8 +93,8 @@ def run_proc(priority, shared_vars, lock, is_detector):
     t.start()
 
     print(f"[*] Processo do Nó ID {priority} rodando. Aguardando eventos...")
-    # ----------------- FIM DO CÓDIGO DO SERVIÇO -----------------
 
+    # -- LOOP PRINCIPAL DO BULLY --
     while True:
         if shared_vars['coordinator_id'] == priority and coordinator:
             print('coordinator:' + str(priority) + '\n', end='', flush=True, file=output_file)
@@ -455,67 +411,3 @@ def run_proc(priority, shared_vars, lock, is_detector):
             if count == 20:
                 break
 
-if __name__ == '__main__':
-
-    debug_file = open('debug.txt', 'w')
-    output_file = open('output.txt', 'w')
-
-    # setting up input of command line arguments
-    args = setup_argument_parser()
-    num_of_processes = args.num_of_processes
-    detector_process = args.detector_process
-    if num_of_processes <= 2:
-        print('ERROR: Number of processes must be greater than 2\n', \
-            end='', flush=True, file=debug_file)
-        sys.exit(0)
-    if detector_process == num_of_processes:
-        print('ERROR: The detector process cannot be the initial coordinator\n', \
-            end='', flush=True, file=debug_file)
-        sys.exit(0)
-    elif detector_process <= 0:
-        print('ERROR: The detector process cannot have ID/priority less than or equal to 0\n', \
-            end='', flush=True, file=debug_file)
-        sys.exit(0)
-    elif detector_process > num_of_processes:
-        print('ERROR: The detector process cannot have ID/priority greater than the number of processes\n', \
-            end='', flush=True, file=debug_file)
-        sys.exit(0)
-
-    # initializing ip address and port for all processes (localhost is used for all processes)
-    base_port = random.randrange(9000, 20000, num_of_processes + 1)
-    ip_addresses_ports = {}
-    for iterator in range(1, num_of_processes + 1):
-        ip_addresses_ports[iterator] = ('127.0.0.1', base_port + iterator)
-
-    print("\n" + "="*55)
-    print("INICIALIZANDO SERVIDORES (ALGORITMO DE BULLY)")
-    print("="*55)
-    for p_id, (ip, port) in ip_addresses_ports.items():
-        porta_cliente = port + 10000
-        print(f"Nó ID {p_id} | Porta Interna: {port} | Porta CLIENTE: {porta_cliente}")
-    print("="*55 + "\n")
-
-    manager = Manager()
-    lock = manager.Lock()
-    shared_vars = manager.dict()
-    jobs = []
-
-    # setting variables to be shared among all processes
-    shared_vars['ip_addresses_ports'] = ip_addresses_ports
-    shared_vars['coordinator_id'] = num_of_processes
-    shared_vars['detector_id'] = detector_process
-    shared_vars['lport_priority_links'] = []
-
-    # process id is the same as process priority
-    for process_id in range(num_of_processes, 0, -1):
-        if process_id == detector_process:
-            process = Process(target=run_proc, args=(process_id, shared_vars, lock, True))
-        else:
-            process = Process(target=run_proc, args=(process_id, shared_vars, lock, False))
-        jobs.append(process)
-        process.start()
-    for process in jobs:
-        process.join()
-
-    debug_file.close()
-    output_file.close()

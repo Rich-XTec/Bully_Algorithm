@@ -150,11 +150,14 @@ def run_proc(priority, shared_vars, lock, is_detector):
                     timeout = True
                     notificar_painel('eleicao')
 
+                    time.sleep(3)
+
                     if priority == len(shared_vars['ip_addresses_ports']) - 1:
                         lock.acquire()
                         shared_vars['coordinator_id'] = priority
                         lock.release()
                         notificar_painel('trabalhando')
+                        time.sleep(2)
 
                         for key in sorted(c_skts.keys())[:-1]:
                             # if key != len(shared_vars['ip_addresses_ports']):
@@ -171,6 +174,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
                         lock.acquire()
                         shared_vars['coordinator_id'] = -1
                         lock.release()
+                        time.sleep(2)
 
                         # send an election msg to all priorities above and wait for their responses
                         # wait for an alive msg from at least one priority above it within some time
@@ -283,6 +287,8 @@ def run_proc(priority, shared_vars, lock, is_detector):
                                 '): received election message from priority ' + str(shared_vars['detector_id']) + \
                                 ' by priority ' + str(priority) + '\n', end='', flush=True, file=debug_file)
                             notificar_painel('eleicao')
+                            time.sleep(3)
+
                         elif response[0] == 'coordinator':
                             # should also be able to use shared_vars['coordinator_id'] here
                             print('DEBUG lineno(' + str(getframeinfo(currentframe()).lineno) + \

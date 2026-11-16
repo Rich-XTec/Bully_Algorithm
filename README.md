@@ -38,7 +38,23 @@ sequenceDiagram
 
 ## 4. Guia de Execução (Ambiente Linux)
 
-O sistema foi desenhado para rodar nativamente em ambientes Linux utilizando o terminal.
+O sistema foi desenhado para rodar nativamente em ambientes Linux e Windows utilizando o terminal.
+
+### Para executar o servidor com a interface em ambiente Linux:
+
+**Passo 1: Instale a biblioteca**
+```bash
+pip install flask requests
+```
+
+**Passo 2 : Abra o Terminal 1 e inicie o Painel Web:**
+```bash
+python3 dashboard.py
+```
+**Passo 3: no navegador**
+Acesse: 
+http://localhost:5000
+###
 
 **Passo 1: Iniciar os nós do Servidor**
 Abra o seu terminal (geralmente `Ctrl + Alt + T` no Ubuntu/Mint) e execute o script principal informando o número de processos e qual nó iniciará como detector:

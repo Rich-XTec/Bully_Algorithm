@@ -169,3 +169,67 @@ DEBUG lineno(367): did not receive coordinator message within time from priority
 DEBUG lineno(380): received coordinator message from priority 4 by priority 1
 DEBUG lineno(251): did not receive coordinator message within time from priority 3 by priority 2
 DEBUG lineno(246): received coordinator message from priority 4 by priority 2
+DEBUG lineno(21): priority 5 has port 15035
+DEBUG lineno(21): priority 2 has port 15032
+DEBUG lineno(21): priority 1 has port 15031
+DEBUG lineno(28): s_skt set by priority 2 to 15032
+DEBUG lineno(28): s_skt set by priority 5 to 15035
+DEBUG lineno(28): s_skt set by priority 1 to 15031
+DEBUG lineno(21): priority 3 has port 15033
+DEBUG lineno(28): s_skt set by priority 3 to 15033
+DEBUG lineno(21): priority 4 has port 15034
+DEBUG lineno(28): s_skt set by priority 4 to 15034
+DEBUG lineno(58): c_skts set by priority 2 to [15031, 15033, 15034, 15035]
+DEBUG lineno(58): c_skts set by priority 5 to [15031, 15032, 15033, 15034]
+DEBUG lineno(58): c_skts set by priority 1 to [15032, 15033, 15034, 15035]
+DEBUG lineno(58): c_skts set by priority 3 to [15031, 15032, 15034, 15035]
+DEBUG lineno(58): c_skts set by priority 4 to [15031, 15032, 15033, 15035]
+DEBUG lineno(79): connections accepted by priority 1 from priorities [2, 5, 3, 4]
+DEBUG lineno(79): connections accepted by priority 3 from priorities [2, 5, 1, 4]
+DEBUG lineno(79): connections accepted by priority 5 from priorities [2, 1, 3, 4]
+DEBUG lineno(79): connections accepted by priority 2 from priorities [5, 1, 3, 4]
+DEBUG lineno(79): connections accepted by priority 4 from priorities [2, 5, 1, 3]
+DEBUG lineno(111): sent heartbeat message to priority 5 by priority 2
+DEBUG lineno(379): received heartbeat message from priority 2 by priority 5
+DEBUG lineno(126): received ack message from priority 5 by priority 2
+DEBUG lineno(385): sent ack message to priority 2 by priority 5
+DEBUG lineno(111): sent heartbeat message to priority 5 by priority 2
+DEBUG lineno(379): received heartbeat message from priority 2 by priority 5
+DEBUG lineno(126): received ack message from priority 5 by priority 2
+DEBUG lineno(385): sent ack message to priority 2 by priority 5
+DEBUG lineno(111): sent heartbeat message to priority 5 by priority 2
+DEBUG lineno(379): received heartbeat message from priority 2 by priority 5
+DEBUG lineno(126): received ack message from priority 5 by priority 2
+DEBUG lineno(385): sent ack message to priority 2 by priority 5
+DEBUG lineno(111): sent heartbeat message to priority 5 by priority 2
+DEBUG lineno(379): received heartbeat message from priority 2 by priority 5
+DEBUG lineno(126): received ack message from priority 5 by priority 2
+DEBUG lineno(385): sent ack message to priority 2 by priority 5
+DEBUG lineno(111): sent heartbeat message to priority 5 by priority 2
+DEBUG lineno(379): received heartbeat message from priority 2 by priority 5
+DEBUG lineno(126): received ack message from priority 5 by priority 2
+DEBUG lineno(385): sent ack message to priority 2 by priority 5
+DEBUG lineno(111): sent heartbeat message to priority 5 by priority 2
+DEBUG lineno(131): did not receive ack message within time from priority 5 by priority 2
+DEBUG lineno(164): sent election message to priority 3 by priority 2
+DEBUG lineno(260): received election message from priority 2 by priority 3
+DEBUG lineno(283): sent alive message to priority 2 by priority 3
+DEBUG lineno(179): received alive message from priority 3 by priority 2
+DEBUG lineno(164): sent election message to priority 4 by priority 2
+DEBUG lineno(260): received election message from priority 2 by priority 4
+DEBUG lineno(283): sent alive message to priority 2 by priority 4
+DEBUG lineno(179): received alive message from priority 4 by priority 2
+DEBUG lineno(297): sent coordinator message to priority 1 by priority 4
+DEBUG lineno(297): sent coordinator message to priority 2 by priority 4
+DEBUG lineno(297): sent coordinator message to priority 3 by priority 4
+DEBUG lineno(320): did not receive coordinator message within time from priority 2 by priority 1
+DEBUG lineno(333): received coordinator message from priority 4 by priority 1
+DEBUG lineno(204): did not receive coordinator message within time from priority 3 by priority 2
+DEBUG lineno(199): received coordinator message from priority 4 by priority 2
+DEBUG lineno(353): received coordinator message from priority 5 by priority 1
+DEBUG lineno(234): received coordinator message from priority 5 by priority 2
+DEBUG lineno(403): sent coordinator message to priority 2 by priority 5
+DEBUG lineno(403): sent coordinator message to priority 3 by priority 5
+DEBUG lineno(353): received coordinator message from priority 5 by priority 3
+DEBUG lineno(403): sent coordinator message to priority 4 by priority 5
+DEBUG lineno(368): received coordinator message from priority 5 by priority 4

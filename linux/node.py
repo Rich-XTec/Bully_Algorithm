@@ -50,43 +50,27 @@ def run_proc(priority, shared_vars, lock, is_detector):
     for iterator in [iterator for iterator in range(1, len(shared_vars['ip_addresses_ports']) + 1) if iterator != priority]:
         c_skts[iterator] = setup_skt((shared_vars['ip_addresses_ports'][iterator][0], \
             shared_vars['ip_addresses_ports'][iterator][1]), 'c', shared_vars)
-        
-        # shared_vars['lport_priority_links'][iterator] = {}
-        # print(str(shared_vars['lport_priority_links'][iterator]))
-        # shared_vars['lport_priority_links'][iterator][c_skts[iterator].getsockname()[1]] = priority
-
-        # shared_vars['lport_priority_links'][iterator][0].append(c_skts[iterator].getsockname()[1])
-        # shared_vars['lport_priority_links'][iterator][1].append(priority)
-
-        # the worst possible way to store this information, in a string, since manager.dict() can only handle mutating a non nested
-        # object, so the above commented code (the first and second parts do the same thing, first being better than the second), 
-        # though a better way to do it, does not work
-        # apparently, mutating non nested data objects like list, dict, etc. also does not work
-        # shared_vars['lport_priority_links'].append(str(iterator) + ':' + str(c_skts[iterator].getsockname()[1]) + ':' + \
-        #     str(priority))
-
-        # using a temp_shared_vars by assigning shared_vars['lport_priority_links'] to it, append to it 
-        # and then reassign it to shared_vars['lport_priority_links']
 
         temp_shared_vars.append(str(iterator) + ':' + str(c_skts[iterator].getsockname()[1]) + ':' + str(priority))
+
     shared_vars['lport_priority_links'] = temp_shared_vars
+
     lock.release()
+
     print('DEBUG lineno(' + str(getframeinfo(currentframe()).lineno) + '): c_skts set by priority ' + str(priority) + ' to ' + \
         str([shared_vars['ip_addresses_ports'][iterator][1] \
         for iterator in range(1, len(shared_vars['ip_addresses_ports']) + 1) if iterator != priority]) + '\n', \
         end='', flush=True, file=debug_file)
+    
     new_skts = {}
     connection_accepts = []
+
     while len(shared_vars['lport_priority_links']) != len(shared_vars['ip_addresses_ports']) * \
         (len(shared_vars['ip_addresses_ports']) - 1):
         pass
     for _ in range(1, len(shared_vars['ip_addresses_ports'])):
         new_skt, addr = s_skt.accept()
-        # new_skts[shared_vars['lport_priority_links'][priority][addr[1]]] = new_skt
-        
-        # new_skts[shared_vars['lport_priority_links'][priority][1][shared_vars['lport_priority_links'][priority][0].index(addr[1])]] = new_skt
 
-        # see comments above
         for value in shared_vars['lport_priority_links']:
             if str(priority) + ':' + str(addr[1]) in value:
                 new_skts[int(value.strip().split(':')[2])] = new_skt
@@ -112,7 +96,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
             print('coordinator:' + str(priority) + '\n', end='', flush=True, file=output_file)
             coordinator = False
 
-        # work done by each process
+        # trabalho realizado por cada processo
         print('work:' + str(priority) + '\n', end='', flush=True, file=output_file)
 
         notificar_painel('trabalhando')
@@ -176,9 +160,9 @@ def run_proc(priority, shared_vars, lock, is_detector):
                         lock.release()
                         time.sleep(2)
 
-                        # send an election msg to all priorities above and wait for their responses
-                        # wait for an alive msg from at least one priority above it within some time
-                        # wait for a coordinator msg within some time
+                        # envia uma mensagem de eleição para todas as prioridades acima e aguarda suas respostas
+                        # aguarda uma mensagem alive de pelo menos uma prioridade acima dela dentro de um determinado período
+                        # aguarda uma mensagem de coordenador dentro de um determinado período
 
                         num_alive = 0
                         for key in sorted(c_skts.keys())[priority - 1:-1]:
@@ -247,7 +231,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
                         break
             if count == 15:
 
-                # wait for a coordinator msg from the initial coordinator
+                # aguarda uma mensagem de coordenador do coordenador inicial
 
                 while shared_vars['coordinator_id'] != len(shared_vars['ip_addresses_ports']):
                     pass
@@ -265,10 +249,10 @@ def run_proc(priority, shared_vars, lock, is_detector):
         elif priority != shared_vars['coordinator_id']:
             if count == 6:
 
-                # wait for an election msg from the detector and send response (only processes with higher priorities need to wait)
-                # then send an alive msg to the detector (only processes with higher priorities have to send)
-                # process with current highest priority will then send a coordinator msg to all the processes
-                # else wait for a coordinator msg in case the detector is the new coordinator (all processes need to wait)
+                # aguarda uma mensagem de eleição do detector e envia uma resposta (somente processos com prioridades maiores precisam aguardar)
+                # em seguida, envia uma mensagem alive ao detector (somente processos com prioridades maiores precisam enviar)
+                # o processo com a maior prioridade atual enviará uma mensagem de coordenador a todos os processos
+                # caso contrário, aguarda uma mensagem de coordenador se o detector for o novo coordenador (todos os processos precisam aguardar)
 
                 response = ''
                 if priority > shared_vars['detector_id']:
@@ -290,7 +274,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
                             time.sleep(3)
 
                         elif response[0] == 'coordinator':
-                            # should also be able to use shared_vars['coordinator_id'] here
+                            # também deveria ser possível usar shared_vars['coordinator_id'] aqui
                             print('DEBUG lineno(' + str(getframeinfo(currentframe()).lineno) + \
                                 '): received coordinator message from priority ' + str(shared_vars['detector_id']) + \
                                 ' by priority ' + str(priority) + '\n', end='', flush=True, file=debug_file)
@@ -300,11 +284,11 @@ def run_proc(priority, shared_vars, lock, is_detector):
                             '): did not receive election or coordinator message within time from priority ' + \
                             str(shared_vars['detector_id']) + ' by priority ' + str(priority) + '\n', \
                             end='', flush=True, file=debug_file)
-                    # TODO here the process with current highest priority sends the coordinator msg to all the processes with lesser
-                    # priority than itself after sending alive msg to the detector, though processes with higher priority than the
-                    # detector just send the alive msg to the detector, after this they should again repeat the entire algo until
-                    # they receive a coordinator msg from the highest priority process due to the initial election started by the
-                    # detector
+                    # TODO: aqui, o processo com a maior prioridade atual envia uma mensagem de coordenador a todos os processos
+                    # com prioridade menor que a sua após enviar uma mensagem alive ao detector. Porém, os processos com prioridade
+                    # maior que a do detector apenas enviam a mensagem alive ao detector; depois disso, devem repetir todo o
+                    # algoritmo até receberem uma mensagem de coordenador do processo com a maior prioridade, devido à eleição
+                    # inicial iniciada pelo detector.
                     if response[0] == 'election':
                         while True:
                             try:
@@ -340,7 +324,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
                                 end='', flush=True, file=debug_file)
                             sys.exit(0)
                         elif response[0] == 'coordinator':
-                            # should also be able to use shared_vars['coordinator_id'] here
+                            # também deveria ser possível usar shared_vars['coordinator_id'] aqui
                             print('DEBUG lineno(' + str(getframeinfo(currentframe()).lineno) + \
                                 '): received coordinator message from priority ' + str(shared_vars['detector_id']) + \
                                 ' by priority ' + str(priority) + '\n', end='', flush=True, file=debug_file)
@@ -369,7 +353,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
                             ' by priority ' + str(priority) + '\n', end='', flush=True, file=debug_file)
             if count == 15:
 
-                # wait for a coordinator msg from the initial coordinator
+                # aguarda uma mensagem de coordenador do coordenador inicial
 
                 while shared_vars['coordinator_id'] != len(shared_vars['ip_addresses_ports']):
                     pass

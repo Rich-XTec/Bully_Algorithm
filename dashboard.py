@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, render_template_string
 import time
 import subprocess
 import os
+import sys
 
 app = Flask(__name__)
 
@@ -26,7 +27,6 @@ HTML_TEMPLATE = """
         }
         h1 { position: absolute; width: 100%; top: 20px; color: #cdd6f4; z-index: 100; text-shadow: 0 0 10px rgba(255,255,255,0.2); pointer-events: none;}
         
-        /* NOVO: Painel de Controle de Inicialização */
         #control-panel {
             position: absolute;
             top: 20px;
@@ -43,7 +43,10 @@ HTML_TEMPLATE = """
         #control-panel h3 { margin-top: 0; color: #cdd6f4; font-size: 16px; margin-bottom: 15px; }
         .input-group { margin-bottom: 10px; }
         .input-group label { display: block; font-size: 12px; color: #bac2de; margin-bottom: 5px; }
-        .input-group input { width: 90%; padding: 8px; border-radius: 6px; border: none; background: #313244; color: white; outline: none; }
+        .input-group input, .input-group select { 
+            width: 90%; padding: 8px; border-radius: 6px; border: none; 
+            background: #313244; color: white; outline: none; font-family: inherit;
+        }
         button { 
             width: 100%; padding: 10px; border-radius: 6px; border: none; 
             background-color: #89b4fa; color: #11111b; font-weight: bold; 
@@ -91,6 +94,16 @@ HTML_TEMPLATE = """
     <!-- Painel Lateral -->
     <div id="control-panel">
         <h3>Controle do Cluster</h3>
+        
+        <!-- NOVO: Seleção do Sistema Operacional -->
+        <div class="input-group">
+            <label>Modelo do Servidor (SO)</label>
+            <select id="os_type">
+                <option value="linux">Linux</option>
+                <option value="windows">Windows</option>
+            </select>
+        </div>
+        
         <div class="input-group">
             <label>Número de Nós (-numproc)</label>
             <input type="number" id="numproc" value="5" min="3" max="15">
@@ -110,6 +123,7 @@ HTML_TEMPLATE = """
 
     <script>
         async function startCluster() {
+            const os_type = document.getElementById('os_type').value;
             const numproc = document.getElementById('numproc').value;
             const detectproc = document.getElementById('detectproc').value;
             
@@ -119,7 +133,11 @@ HTML_TEMPLATE = """
             const response = await fetch('/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ numproc: parseInt(numproc), detectproc: parseInt(detectproc) })
+                body: JSON.stringify({ 
+                    os_type: os_type, 
+                    numproc: parseInt(numproc), 
+                    detectproc: parseInt(detectproc) 
+                })
             });
             const data = await response.json();
             
@@ -232,15 +250,28 @@ def index():
 def start_server_route():
     global server_process, nodes_state
     data = request.json
+    
+    # Coleta os dados recebidos da interface
+    os_type = data.get('os_type', 'linux')
     numproc = str(data.get('numproc', 5))
     detectproc = str(data.get('detectproc', 2))
+    
+    # Decide qual arquivo e executável usar baseado no SO selecionado
+    if os_type == 'linux':
+        script_path = 'linux/main.py'
+        # No Linux/Mac geralmente o executável principal é chamado de python3
+        python_exec = 'python3' 
+    else:
+        script_path = 'windows/main_win.py'
+        # No Windows geralmente o executável global é apenas python
+        python_exec = 'python'
     
     # Se já existir um processo rodando, não inicia outro
     if server_process is None or server_process.poll() is not None:
         nodes_state.clear() # Limpa nós antigos da tela
-        # Dispara o comando no terminal em background
-        server_process = subprocess.Popen(['python3', 'main.py', '-numproc', numproc, '-detectproc', detectproc])
-        return jsonify({"status": "started"})
+        # Dispara o comando no terminal em background utilizando o caminho correto
+        server_process = subprocess.Popen([python_exec, script_path, '-numproc', numproc, '-detectproc', detectproc])
+        return jsonify({"status": "started", "path_used": script_path})
     
     return jsonify({"status": "already_running"})
 

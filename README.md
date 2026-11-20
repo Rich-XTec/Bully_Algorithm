@@ -55,7 +55,9 @@ python3 dashboard.py
 Acesse: 
 http://localhost:5000
 
-### Para Iniciar o serviço:
+**Na interface é possivel selecionar quandos nós e o detector e executar o servidor.**
+
+### Para Iniciar o serviço pelo terminal, sem UI:
 
 **Passo 1: Iniciar os nós do Servidor**
 Abra o seu terminal (geralmente `Ctrl + Alt + T` no Ubuntu/Mint) e execute o script principal informando o número de processos e qual nó iniciará como detector:

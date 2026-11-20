@@ -2,6 +2,7 @@ import sys
 import time
 import socket
 import threading
+import requests # Dashboard
 from inspect import currentframe, getframeinfo
 
 from network import setup_skt
@@ -9,6 +10,18 @@ from service import client_listener
 
 
 def run_proc(priority, shared_vars, lock, is_detector):
+    # --- FUNÇÃO DE TELEMETRIA PARA O DASHBOARD ---
+    def notificar_painel(status):
+        def enviar():
+            try:
+                lider_atual = shared_vars['coordinator_id']
+                payload = {"id": priority, "status": status, "leader_id": lider_atual}
+                requests.post('http://127.0.0.1:5000/update', json=payload, timeout=0.5)
+            except:
+                pass
+        threading.Thread(target=enviar, daemon=True).start()
+    # ---------------------------------------------
+
     # Arquivos de log precisam ser abertos no processo para não dar conflito
     debug_file = open('debug.txt', 'a')
     output_file = open('output.txt', 'a')
@@ -102,6 +115,8 @@ def run_proc(priority, shared_vars, lock, is_detector):
         # work done by each process
         print('work:' + str(priority) + '\n', end='', flush=True, file=output_file)
 
+        notificar_painel('trabalhando')
+
         time.sleep(5)
         count += 1
         if is_detector:
@@ -133,10 +148,17 @@ def run_proc(priority, shared_vars, lock, is_detector):
                         '): did not receive ack message within time from priority ' + str(shared_vars['coordinator_id']) + \
                         ' by priority ' + str(priority) + '\n', end='', flush=True, file=debug_file)
                     timeout = True
+                    notificar_painel('eleicao')
+
+                    time.sleep(3)
+
                     if priority == len(shared_vars['ip_addresses_ports']) - 1:
                         lock.acquire()
                         shared_vars['coordinator_id'] = priority
                         lock.release()
+                        notificar_painel('trabalhando')
+                        time.sleep(2)
+
                         for key in sorted(c_skts.keys())[:-1]:
                             # if key != len(shared_vars['ip_addresses_ports']):
                             while True:
@@ -152,6 +174,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
                         lock.acquire()
                         shared_vars['coordinator_id'] = -1
                         lock.release()
+                        time.sleep(2)
 
                         # send an election msg to all priorities above and wait for their responses
                         # wait for an alive msg from at least one priority above it within some time
@@ -209,6 +232,8 @@ def run_proc(priority, shared_vars, lock, is_detector):
                             lock.acquire()
                             shared_vars['coordinator_id'] = priority
                             lock.release()
+                            notificar_painel('trabalhando')
+
                             for key in sorted(c_skts.keys())[:priority]:
                                 while True:
                                     try:
@@ -261,6 +286,9 @@ def run_proc(priority, shared_vars, lock, is_detector):
                             print('DEBUG lineno(' + str(getframeinfo(currentframe()).lineno) + \
                                 '): received election message from priority ' + str(shared_vars['detector_id']) + \
                                 ' by priority ' + str(priority) + '\n', end='', flush=True, file=debug_file)
+                            notificar_painel('eleicao')
+                            time.sleep(3)
+
                         elif response[0] == 'coordinator':
                             # should also be able to use shared_vars['coordinator_id'] here
                             print('DEBUG lineno(' + str(getframeinfo(currentframe()).lineno) + \
@@ -391,8 +419,13 @@ def run_proc(priority, shared_vars, lock, is_detector):
                         pass
             if count == 6:
                 print('failed:' + str(priority) + '\n', end='', flush=True, file=output_file)
+
+                notificar_painel('falhou')
+
                 time.sleep(120)
+
                 print('recovered:' + str(priority) + '\n', end='', flush=True, file=output_file)
+
                 lock.acquire()
                 shared_vars['coordinator_id'] = priority
                 lock.release()

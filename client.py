@@ -1,6 +1,12 @@
 import socket
 import time
 
+def next_sequential_port(current_port: int, min_port: int, max_port: int) -> int:
+    next_port = current_port + 1
+    if next_port > max_port:
+        return min_port  # opcional: volta para a primeira porta do intervalo
+    return next_port
+
 def request_service():
     print("--- Cliente Iniciado ---")
     # Como o nosso servidor usa portas aleatórias baseadas em um range, 
@@ -41,8 +47,8 @@ def request_service():
                 
         except ConnectionRefusedError:
             print(f"[!] Erro: Conexão recusada na porta {target_port}. O nó pode estar morto.")
-            # Tenta pular para a próxima porta para tentar achar alguém vivo
-            target_port = target_port - (target_port % 10) + ((target_port % 10) % 5) + 1
+            # Tenta pular para a próxima porta para tentar achar alguém vivo            
+            target_port = next_sequential_port(target_port, 10001, 30000)
             time.sleep(1)
         except socket.timeout:
             print(f"[!] Erro: Timeout na porta {target_port}.")

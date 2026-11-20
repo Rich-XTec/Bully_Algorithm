@@ -36,11 +36,13 @@ sequenceDiagram
     S5->>C: Responde "SUCESSO: Serviço processado as 14:30:00"
 ```
 
-## 4. Guia de Execução (Ambiente Linux)
+## 4. Guia de Execução (Ambiente Linux/Windows)
 
-O sistema foi desenhado para rodar nativamente em ambientes Linux e Windows utilizando o terminal.
+Os projeto foi desenhado para rodar nativamente em ambientes Linux e Windows utilizando o terminal.
 
-### Para executar o servidor com a interface em ambiente Linux:
+O serviço do cliente é o mesmo para os dois SO.
+
+### Para executar o servidor com a interface em ambiente Linux/Windows:
 
 **Passo 1: Instale a biblioteca**
 ```bash
@@ -55,7 +57,7 @@ python3 dashboard.py
 Acesse: 
 http://localhost:5000
 
-**Na interface é possivel selecionar quandos nós e o detector e executar o servidor.**
+**Na interface é possivel selecionar quantos nós, o detector e executar o servidor.**
 
 ### Para Iniciar o serviço pelo terminal, sem UI:
 

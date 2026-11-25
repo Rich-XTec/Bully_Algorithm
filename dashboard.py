@@ -1,9 +1,14 @@
 from flask import Flask, request, jsonify, render_template_string
 import time
+import subprocess
+import os
+import sys
 
 app = Flask(__name__)
 
 nodes_state = {}
+# Variável para guardar o processo do terminal que o Flask vai abrir
+server_process = None 
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -14,113 +19,145 @@ HTML_TEMPLATE = """
     <style>
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background-color: #11111b; /* Fundo mais escuro para destacar as luzes */
+            background-color: #11111b; 
             color: white; 
             text-align: center; 
             margin: 0;
-            overflow: hidden; /* Remove rolagem para parecer um radar */
+            overflow: hidden; 
         }
-        h1 { position: absolute; width: 100%; top: 20px; color: #cdd6f4; z-index: 100; text-shadow: 0 0 10px rgba(255,255,255,0.2); }
+        h1 { position: absolute; width: 100%; top: 20px; color: #cdd6f4; z-index: 100; text-shadow: 0 0 10px rgba(255,255,255,0.2); pointer-events: none;}
         
+        #control-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: #1e1e2e;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #313244;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            z-index: 200;
+            text-align: left;
+            width: 220px;
+        }
+        #control-panel h3 { margin-top: 0; color: #cdd6f4; font-size: 16px; margin-bottom: 15px; }
+        .input-group { margin-bottom: 10px; }
+        .input-group label { display: block; font-size: 12px; color: #bac2de; margin-bottom: 5px; }
+        .input-group input, .input-group select { 
+            width: 90%; padding: 8px; border-radius: 6px; border: none; 
+            background: #313244; color: white; outline: none; font-family: inherit;
+        }
+        button { 
+            width: 100%; padding: 10px; border-radius: 6px; border: none; 
+            background-color: #89b4fa; color: #11111b; font-weight: bold; 
+            cursor: pointer; transition: 0.2s; margin-top: 10px;
+        }
+        button:hover { background-color: #74c7ec; }
+        button:disabled { background-color: #45475a; color: #bac2de; cursor: not-allowed; }
+
         #dashboard-area {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            position: relative; width: 100vw; height: 100vh;
+            display: flex; justify-content: center; align-items: center;
         }
+        #connections { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+        .line-heartbeat { stroke: rgba(255, 255, 255, 0.15); stroke-width: 2; stroke-dasharray: 8, 8; animation: dash 15s linear infinite; }
+        .line-election { stroke: rgba(250, 179, 135, 0.4); stroke-width: 3; stroke-dasharray: 15, 5; animation: dash 5s linear infinite reverse; }
+        @keyframes dash { to { stroke-dashoffset: 1000; } }
 
-        /* SVG para desenhar as linhas */
-        #connections {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 1;
-            pointer-events: none;
-        }
-
-        /* Linhas sutis brancas de Heartbeat */
-        .line-heartbeat {
-            stroke: rgba(255, 255, 255, 0.15);
-            stroke-width: 2;
-            stroke-dasharray: 8, 8;
-            animation: dash 15s linear infinite;
-        }
-
-        /* Linhas de Eleição (Laranja) */
-        .line-election {
-            stroke: rgba(250, 179, 135, 0.4);
-            stroke-width: 3;
-            stroke-dasharray: 15, 5;
-            animation: dash 5s linear infinite reverse;
-        }
-
-        @keyframes dash {
-            to { stroke-dashoffset: 1000; }
-        }
-
-        #nodes-container {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 10;
-        }
-
+        #nodes-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; }
         .node { 
-            position: absolute;
-            padding: 15px; 
-            border-radius: 50%; /* Nós redondos para ficar mais espacial */
-            width: 110px; height: 110px;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            background-color: #313244; 
-            box-shadow: 0 0 20px rgba(0,0,0,0.5); 
-            transition: all 0.5s ease-out; 
-            transform: translate(-50%, -50%); /* Centraliza o nó exatamente na coordenada X,Y */
+            position: absolute; padding: 15px; border-radius: 50%; 
+            width: 110px; height: 110px; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background-color: #313244; box-shadow: 0 0 20px rgba(0,0,0,0.5); 
+            transition: all 0.5s ease-out; transform: translate(-50%, -50%); 
         }
         .node h2 { margin: 0 0 5px 0; font-size: 20px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);}
         .node p { margin: 2px 0; font-size: 12px; color: #bac2de; }
         
-        /* Cores de Status */
         .leader { 
-            background-color: #a6e3a1; color: #11111b; 
-            border: 4px solid #f9e2af; 
-            box-shadow: 0 0 30px rgba(166, 227, 161, 0.6);
-            transform: translate(-50%, -50%) scale(1.15); 
-            z-index: 20;
+            background-color: #a6e3a1; color: #11111b; border: 4px solid #f9e2af; 
+            box-shadow: 0 0 30px rgba(166, 227, 161, 0.6); transform: translate(-50%, -50%) scale(1.15); z-index: 20;
         }
         .leader p, .leader h2 { color: #11111b; font-weight: bold; text-shadow: none;}
-        
-        .dead { 
-            background-color: #45475a; 
-            border: 2px solid #f38ba8;
-            opacity: 0.5; color: #f38ba8; 
-            box-shadow: none;
-        }
+        .dead { background-color: #45475a; border: 2px solid #f38ba8; opacity: 0.5; color: #f38ba8; box-shadow: none; }
         .dead p, .dead h2 { color: #f38ba8; }
-
         .election { 
-            background-color: #fab387; color: #11111b; 
-            box-shadow: 0 0 30px rgba(250, 179, 135, 0.8);
-            animation: pulse 1s infinite; 
+            background-color: #fab387; color: #11111b; box-shadow: 0 0 30px rgba(250, 179, 135, 0.8); animation: pulse 1s infinite; 
         }
         .election p, .election h2 { color: #11111b; text-shadow: none;}
-        
-        @keyframes pulse { 
-            0% { transform: translate(-50%, -50%) scale(1); } 
-            50% { transform: translate(-50%, -50%) scale(1.1); } 
-            100% { transform: translate(-50%, -50%) scale(1); } 
-        }
+        @keyframes pulse { 0% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.1); } 100% { transform: translate(-50%, -50%) scale(1); } }
     </style>
 </head>
 <body>
     <h1>Topologia da Rede - Algoritmo de Bully</h1>
+    
+    <!-- Painel Lateral -->
+    <div id="control-panel">
+        <h3>Controle do Cluster</h3>
+        
+        <!-- NOVO: Seleção do Sistema Operacional -->
+        <div class="input-group">
+            <label>Modelo do Servidor (SO)</label>
+            <select id="os_type">
+                <option value="linux">Linux</option>
+                <option value="windows">Windows</option>
+            </select>
+        </div>
+        
+        <div class="input-group">
+            <label>Número de Nós (-numproc)</label>
+            <input type="number" id="numproc" value="5" min="3" max="15">
+        </div>
+        <div class="input-group">
+            <label>ID do Detector (-detectproc)</label>
+            <input type="number" id="detectproc" value="2" min="1" max="15">
+        </div>
+        <button id="start-btn" onclick="startCluster()">Ligar Servidores</button>
+        <button id="stop-btn" onclick="stopCluster()" style="background-color: #f38ba8; display: none;">Desligar Servidores</button>
+    </div>
+
     <div id="dashboard-area">
         <svg id="connections"></svg>
         <div id="nodes-container"></div>
     </div>
 
     <script>
+        async function startCluster() {
+            const os_type = document.getElementById('os_type').value;
+            const numproc = document.getElementById('numproc').value;
+            const detectproc = document.getElementById('detectproc').value;
+            
+            document.getElementById('start-btn').innerText = 'Iniciando...';
+            document.getElementById('start-btn').disabled = true;
+
+            const response = await fetch('/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    os_type: os_type, 
+                    numproc: parseInt(numproc), 
+                    detectproc: parseInt(detectproc) 
+                })
+            });
+            const data = await response.json();
+            
+            if (data.status === 'started' || data.status === 'already_running') {
+                document.getElementById('start-btn').style.display = 'none';
+                document.getElementById('stop-btn').style.display = 'block';
+            }
+        }
+
+        async function stopCluster() {
+            await fetch('/stop', { method: 'POST' });
+            document.getElementById('stop-btn').style.display = 'none';
+            const startBtn = document.getElementById('start-btn');
+            startBtn.style.display = 'block';
+            startBtn.disabled = false;
+            startBtn.innerText = 'Ligar Servidores';
+            document.getElementById('nodes-container').innerHTML = '';
+            document.getElementById('connections').innerHTML = '';
+        }
+
         async function fetchStatus() {
             try {
                 const response = await fetch('/status');
@@ -132,23 +169,17 @@ HTML_TEMPLATE = """
                 let nodesHtml = '';
                 let svgHtml = '';
 
-                // Pega os IDs em ordem crescente
                 const sortedIds = Object.keys(data).sort((a, b) => a - b);
                 const numNodes = sortedIds.length;
 
-                // Centro da tela e cálculo do raio (depende do tamanho do navegador)
                 const centerX = window.innerWidth / 2;
                 const centerY = window.innerHeight / 2;
-                const radius = Math.min(centerX, centerY) * 0.65; // Ocupa 65% do espaço
+                const radius = Math.min(centerX, centerY) * 0.65;
 
-                const positions = {}; // Guarda as coordenadas para traçar as linhas depois
+                const positions = {}; 
 
-                // 1º Passo: Calcular posições e renderizar os nós no HTML
                 sortedIds.forEach((id, index) => {
                     const node = data[id];
-                    
-                    // Matemática trigonométrica para distribuir num círculo
-                    // Math.PI / 2 rotaciona para começar do topo da tela
                     const angle = (index / numNodes) * (2 * Math.PI) - (Math.PI / 2);
                     const x = centerX + radius * Math.cos(angle);
                     const y = centerY + radius * Math.sin(angle);
@@ -175,12 +206,10 @@ HTML_TEMPLATE = """
                     `;
                 });
 
-                // 2º Passo: Renderizar as linhas sutis conectando as coordenadas
                 sortedIds.forEach(id => {
                     const node = data[id];
-                    if (node.status === 'falhou') return; // Nós mortos não têm conexões
+                    if (node.status === 'falhou') return; 
                     
-                    // Se estiver trabalhando, traça linha branca de heartbeat para o LÍDER
                     if (node.status === 'trabalhando' && node.leader_id !== -1 && parseInt(id) !== node.leader_id) {
                         const targetId = String(node.leader_id);
                         if (positions[targetId] && data[targetId].status !== 'falhou') {
@@ -188,7 +217,6 @@ HTML_TEMPLATE = """
                         }
                     }
 
-                    // Se estiver em eleição, traça linha laranja para IDs maiores
                     if (node.status === 'eleicao') {
                         sortedIds.forEach(targetId => {
                             if (parseInt(targetId) > parseInt(id) && data[targetId].status !== 'falhou') {
@@ -206,7 +234,6 @@ HTML_TEMPLATE = """
             }
         }
 
-        // Atualiza a tela suavemente e lida com redimensionamento da janela
         setInterval(fetchStatus, 1000);
         window.addEventListener('resize', fetchStatus);
         fetchStatus();
@@ -218,6 +245,44 @@ HTML_TEMPLATE = """
 @app.route('/')
 def index():
     return render_template_string(HTML_TEMPLATE)
+
+@app.route('/start', methods=['POST'])
+def start_server_route():
+    global server_process, nodes_state
+    data = request.json
+    
+    # Coleta os dados recebidos da interface
+    os_type = data.get('os_type', 'linux')
+    numproc = str(data.get('numproc', 5))
+    detectproc = str(data.get('detectproc', 2))
+    
+    # Decide qual arquivo e executável usar baseado no SO selecionado
+    if os_type == 'linux':
+        script_path = 'linux/main.py'
+        # No Linux/Mac geralmente o executável principal é chamado de python3
+        python_exec = 'python3' 
+    else:
+        script_path = 'windows/main_win.py'
+        # No Windows geralmente o executável global é apenas python
+        python_exec = 'python'
+    
+    # Se já existir um processo rodando, não inicia outro
+    if server_process is None or server_process.poll() is not None:
+        nodes_state.clear() # Limpa nós antigos da tela
+        # Dispara o comando no terminal em background utilizando o caminho correto
+        server_process = subprocess.Popen([python_exec, script_path, '-numproc', numproc, '-detectproc', detectproc])
+        return jsonify({"status": "started", "path_used": script_path})
+    
+    return jsonify({"status": "already_running"})
+
+@app.route('/stop', methods=['POST'])
+def stop_server_route():
+    global server_process, nodes_state
+    if server_process and server_process.poll() is None:
+        server_process.terminate() # Mata o processo
+        server_process.wait()
+    nodes_state.clear()
+    return jsonify({"status": "stopped"})
 
 @app.route('/update', methods=['POST'])
 def update():

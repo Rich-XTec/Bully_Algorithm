@@ -36,11 +36,13 @@ sequenceDiagram
     S5->>C: Responde "SUCESSO: Serviço processado as 14:30:00"
 ```
 
-## 4. Guia de Execução (Ambiente Linux)
+## 4. Guia de Execução (Ambiente Linux/Windows)
 
-O sistema foi desenhado para rodar nativamente em ambientes Linux e Windows utilizando o terminal.
+Os projeto foi desenhado para rodar nativamente em ambientes Linux e Windows utilizando o terminal.
 
-### Para executar o servidor com a interface em ambiente Linux:
+O serviço do cliente é o mesmo para os dois SO.
+
+### Para executar o servidor com a interface em ambiente Linux/Windows:
 
 **Passo 1: Instale a biblioteca**
 ```bash
@@ -51,11 +53,22 @@ pip install flask requests
 ```bash
 python3 dashboard.py
 ```
+
 **Passo 3: no navegador**
 Acesse: 
 http://localhost:5000
 
-### Para Iniciar o serviço:
+**Na interface é possivel selecionar quantos nós, o detector e executar o servidor.**
+
+**Passo 4: Executar o Cliente**
+EM uma nova aba do terminal, execute o cliente:
+```bash
+python3 client.py
+```
+O prompt pedirá a porta. Digite a porta cliente (ex: `26975`) de um nó que **não seja** o ID 5. Você verá o terminal mostrar o cliente conectando no nó, recebendo o aviso de que não é o líder, e redirecionando para o líder (ID 5).
+
+
+### Para Iniciar o serviço pelo terminal, sem UI:
 
 **Passo 1: Iniciar os nós do Servidor**
 Abra o seu terminal (geralmente `Ctrl + Alt + T` no Ubuntu/Mint) e execute o script principal informando o número de processos e qual nó iniciará como detector:
@@ -77,7 +90,7 @@ Na mesma nova aba de terminal, execute o cliente:
 ```bash
 python3 client.py
 ```
-O prompt pedirá a porta. Digite a porta cliente (ex: `26975`) de um nó que **não seja** o ID 5. Você verá o terminal mostrar o cliente conectando no nó, recebendo o aviso de que não é o líder, e redirecionando perfeitamente para o líder (ID 5).
+O prompt pedirá a porta. Digite a porta cliente (ex: `26975`) de um nó que **não seja** o ID 5. Você verá o terminal mostrar o cliente conectando no nó, recebendo o aviso de que não é o líder, e redirecionando para o líder (ID 5).
 
 ## 5. Trechos de Código Relevantes
 
@@ -134,6 +147,6 @@ elif resp.startswith("NOT_LEADER"):
     print(f"[-] O nó conectado não é o líder. O líder atual é o ID {leader_id}.")
     print(f"[*] Redirecionando para o líder na porta {porta_lider}.")
                 
-    # Atualiza a porta alvo com a informação exata recebida
+    # Atualiza a porta alvo com a informação recebida
     target_port = porta_lider
 ```

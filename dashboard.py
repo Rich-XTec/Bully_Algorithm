@@ -501,9 +501,9 @@ def update():
 def status():
     now = time.time()
     for nid, info in nodes_state.items():
-        if info['status'] != 'falhou' and (now - info['last_seen'] > 12):
+        if info['status'] != 'falhou' and (now - info['last_seen'] > 20):
             info['status'] = 'falhou'
-            add_event(f"Nó ID {nid} sem resposta (> 12s): marcado como FALHOU")
+            add_event(f"Nó ID {nid} sem resposta (> 20s): marcado como FALHOU")
     return jsonify({
         "nodes": nodes_state,
         "events": events_log

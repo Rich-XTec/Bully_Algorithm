@@ -53,22 +53,6 @@ def run_proc(priority, shared_vars, lock, is_detector):
     for iterator in [iterator for iterator in range(1, len(shared_vars['ip_addresses_ports']) + 1) if iterator != priority]:
         c_skts[iterator] = setup_skt((shared_vars['ip_addresses_ports'][iterator][0], \
             shared_vars['ip_addresses_ports'][iterator][1]), 'c', shared_vars)
-        # shared_vars['lport_priority_links'][iterator] = {}
-        # print(str(shared_vars['lport_priority_links'][iterator]))
-        # shared_vars['lport_priority_links'][iterator][c_skts[iterator].getsockname()[1]] = priority
-
-        # shared_vars['lport_priority_links'][iterator][0].append(c_skts[iterator].getsockname()[1])
-        # shared_vars['lport_priority_links'][iterator][1].append(priority)
-
-        # the worst possible way to store this information, in a string, since manager.dict() can only handle mutating a non nested
-        # object, so the above commented code (the first and second parts do the same thing, first being better than the second), 
-        # though a better way to do it, does not work
-        # apparently, mutating non nested data objects like list, dict, etc. also does not work
-        # shared_vars['lport_priority_links'].append(str(iterator) + ':' + str(c_skts[iterator].getsockname()[1]) + ':' + \
-        #     str(priority))
-
-        # using a temp_shared_vars by assigning shared_vars['lport_priority_links'] to it, append to it 
-        # and then reassign it to shared_vars['lport_priority_links']
         temp_shared_vars.append(str(iterator) + ':' + str(c_skts[iterator].getsockname()[1]) + ':' + str(priority))
     shared_vars['lport_priority_links'] = temp_shared_vars
     lock.release()
@@ -83,11 +67,6 @@ def run_proc(priority, shared_vars, lock, is_detector):
         pass
     for _ in range(1, len(shared_vars['ip_addresses_ports'])):
         new_skt, addr = s_skt.accept()
-        # new_skts[shared_vars['lport_priority_links'][priority][addr[1]]] = new_skt
-        
-        # new_skts[shared_vars['lport_priority_links'][priority][1][shared_vars['lport_priority_links'][priority][0].index(addr[1])]] = new_skt
-
-        # see comments above
         for value in shared_vars['lport_priority_links']:
             if str(priority) + ':' + str(addr[1]) in value:
                 new_skts[int(value.strip().split(':')[2])] = new_skt
@@ -467,9 +446,9 @@ def run_proc(priority, shared_vars, lock, is_detector):
                 report_status(
                     priority, "falhou", -1,
                     internal_port, client_port, is_detector=False,
-                    event=f"Líder inicial (ID {priority}) entrou em FALHA por 120s"
+                    event=f"Líder inicial (ID {priority}) entrou em FALHA por 30s"
                 )
-                time.sleep(120)
+                time.sleep(30)
                 print('recovered:' + str(priority) + '\n', end='', flush=True, file=output_file)
                 lock.acquire()
                 shared_vars['coordinator_id'] = priority

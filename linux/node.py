@@ -10,15 +10,29 @@ from service import client_listener
 
 
 def run_proc(priority, shared_vars, lock, is_detector):
+    internal_port = shared_vars['ip_addresses_ports'][priority][1]
+    client_port = internal_port + 10000
+
     # --- FUNÇÃO DE TELEMETRIA PARA O DASHBOARD ---
-    def notificar_painel(status):
+    def notificar_painel(status, event=None):
+        lider_atual = shared_vars['coordinator_id']
+        payload = {
+            "id": priority,
+            "status": status,
+            "leader_id": lider_atual,
+            "internal_port": internal_port,
+            "client_port": client_port,
+            "is_detector": is_detector
+        }
+        if event:
+            payload["event"] = event
+
         def enviar():
             try:
-                lider_atual = shared_vars['coordinator_id']
-                payload = {"id": priority, "status": status, "leader_id": lider_atual}
                 requests.post('http://127.0.0.1:5000/update', json=payload, timeout=0.5)
-            except:
+            except requests.RequestException:
                 pass
+
         threading.Thread(target=enviar, daemon=True).start()
     # ---------------------------------------------
 
@@ -81,14 +95,12 @@ def run_proc(priority, shared_vars, lock, is_detector):
         end='', flush=True, file=debug_file)
     
     # -- INICIALIZA O SERVIÇO CLIENTE --
-    # A porta do cliente será a porta interna + 10000 para não dar conflito
-    client_port = shared_vars['ip_addresses_ports'][priority][1] + 10000
-    
     # Inicia a thread que fica rodando em paralelo ao Bully
     t = threading.Thread(target=client_listener, args=(priority, shared_vars, client_port), daemon=True)
     t.start()
 
     print(f"[*] Processo do Nó ID {priority} rodando. Aguardando eventos...")
+    notificar_painel('trabalhando', event=f"Nó ID {priority} online (Porta Cliente: {client_port})")
 
     # -- LOOP PRINCIPAL DO BULLY --
     while True:
@@ -126,13 +138,14 @@ def run_proc(priority, shared_vars, lock, is_detector):
                     print('DEBUG lineno(' + str(getframeinfo(currentframe()).lineno) + \
                         '): received ack message from priority ' + str(shared_vars['coordinator_id']) + \
                         ' by priority ' + str(priority) + '\n', end='', flush=True, file=debug_file)
+                    notificar_painel('trabalhando')
                 except socket.timeout:
                     new_skts[shared_vars['coordinator_id']].settimeout(None)
                     print('DEBUG lineno(' + str(getframeinfo(currentframe()).lineno) + \
                         '): did not receive ack message within time from priority ' + str(shared_vars['coordinator_id']) + \
                         ' by priority ' + str(priority) + '\n', end='', flush=True, file=debug_file)
                     timeout = True
-                    notificar_painel('eleicao')
+                    notificar_painel('eleicao', event=f"Detector ID {priority} detectou falha do líder e iniciou ELEIÇÃO")
 
                     time.sleep(3)
 
@@ -140,7 +153,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
                         lock.acquire()
                         shared_vars['coordinator_id'] = priority
                         lock.release()
-                        notificar_painel('trabalhando')
+                        notificar_painel('trabalhando', event=f"Detector ID {priority} assumiu diretamente como LÍDER")
                         time.sleep(2)
 
                         for key in sorted(c_skts.keys())[:-1]:
@@ -207,6 +220,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
                                     print('DEBUG lineno(' + str(getframeinfo(currentframe()).lineno) + \
                                         '): received coordinator message from priority ' + str(key) + \
                                         ' by priority ' + str(priority) + '\n', end='', flush=True, file=debug_file)
+                                    notificar_painel('trabalhando', event=f"Nó ID {priority} reconheceu ID {key} como novo LÍDER")
                                 except socket.timeout:
                                     new_skts[key].settimeout(None)
                                     print('DEBUG lineno(' + str(getframeinfo(currentframe()).lineno) + \
@@ -216,7 +230,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
                             lock.acquire()
                             shared_vars['coordinator_id'] = priority
                             lock.release()
-                            notificar_painel('trabalhando')
+                            notificar_painel('trabalhando', event=f"Detector ID {priority} venceu a eleição e assumiu como LÍDER")
 
                             for key in sorted(c_skts.keys())[:priority]:
                                 while True:
@@ -234,7 +248,8 @@ def run_proc(priority, shared_vars, lock, is_detector):
                 # aguarda uma mensagem de coordenador do coordenador inicial
 
                 while shared_vars['coordinator_id'] != len(shared_vars['ip_addresses_ports']):
-                    pass
+                    notificar_painel('trabalhando')
+                    time.sleep(2)
                 response = new_skts[shared_vars['coordinator_id']].recv(256).decode('ascii').strip().split(':')
                 if response[0] != 'coordinator' or int(response[1]) != shared_vars['coordinator_id']:
                     print('ERROR lineno(' + str(getframeinfo(currentframe()).lineno) + \
@@ -270,7 +285,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
                             print('DEBUG lineno(' + str(getframeinfo(currentframe()).lineno) + \
                                 '): received election message from priority ' + str(shared_vars['detector_id']) + \
                                 ' by priority ' + str(priority) + '\n', end='', flush=True, file=debug_file)
-                            notificar_painel('eleicao')
+                            notificar_painel('eleicao', event=f"Nó ID {priority} recebeu ELEIÇÃO e enviou ALIVE")
                             time.sleep(3)
 
                         elif response[0] == 'coordinator':
@@ -289,7 +304,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
                     # maior que a do detector apenas enviam a mensagem alive ao detector; depois disso, devem repetir todo o
                     # algoritmo até receberem uma mensagem de coordenador do processo com a maior prioridade, devido à eleição
                     # inicial iniciada pelo detector.
-                    if response[0] == 'election':
+                    if response and response[0] == 'election':
                         while True:
                             try:
                                 c_skts[shared_vars['detector_id']].sendall(('alive:' + str(priority)).encode('utf-8'))
@@ -303,6 +318,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
                             lock.acquire()
                             shared_vars['coordinator_id'] = priority
                             lock.release()
+                            notificar_painel('trabalhando', event=f"Nó ID {priority} venceu a eleição e assumiu como novo LÍDER")
                             for key in sorted(c_skts.keys())[:-1]:
                                 while True:
                                     try:
@@ -356,7 +372,8 @@ def run_proc(priority, shared_vars, lock, is_detector):
                 # aguarda uma mensagem de coordenador do coordenador inicial
 
                 while shared_vars['coordinator_id'] != len(shared_vars['ip_addresses_ports']):
-                    pass
+                    notificar_painel('trabalhando')
+                    time.sleep(2)
                 response = new_skts[shared_vars['coordinator_id']].recv(256).decode('ascii').strip().split(':')
                 if response[0] != 'coordinator' or int(response[1]) != shared_vars['coordinator_id']:
                     print('ERROR lineno(' + str(getframeinfo(currentframe()).lineno) + \
@@ -371,7 +388,8 @@ def run_proc(priority, shared_vars, lock, is_detector):
         if shared_vars['coordinator_id'] == priority and priority == len(shared_vars['ip_addresses_ports']) - 1:
             if count == 15:
                 while shared_vars['coordinator_id'] != len(shared_vars['ip_addresses_ports']):
-                    pass
+                    notificar_painel('trabalhando')
+                    time.sleep(2)
                 response = new_skts[shared_vars['coordinator_id']].recv(256).decode('ascii').strip().split(':')
                 if response[0] != 'coordinator' or int(response[1]) != shared_vars['coordinator_id']:
                     print('ERROR lineno(' + str(getframeinfo(currentframe()).lineno) + \
@@ -403,17 +421,16 @@ def run_proc(priority, shared_vars, lock, is_detector):
                         pass
             if count == 6:
                 print('failed:' + str(priority) + '\n', end='', flush=True, file=output_file)
-
-                notificar_painel('falhou')
+                notificar_painel('falhou', event=f"Líder inicial (ID {priority}) entrou em FALHA por 120s")
 
                 time.sleep(120)
 
                 print('recovered:' + str(priority) + '\n', end='', flush=True, file=output_file)
-
                 lock.acquire()
                 shared_vars['coordinator_id'] = priority
                 lock.release()
                 coordinator = True
+                notificar_painel('trabalhando', event=f"Nó ID {priority} RECUPERADO e reassumiu como LÍDER")
                 for key in sorted(c_skts.keys()):
                     while True:
                         try:

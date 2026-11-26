@@ -421,19 +421,22 @@ def start_server_route():
     numproc = str(data.get('numproc', 5))
     detectproc = str(data.get('detectproc', 2))
 
-    if os_type == 'linux':
-        script_path = 'linux/main.py'
-        python_exec = 'python3'
-    else:
-        script_path = 'windows/main_win.py'
-        python_exec = sys.executable
+    script_path = 'linux/main.py' if os_type == 'linux' else 'windows/main_win.py'
+    python_exec = sys.executable
 
     if server_process is None or server_process.poll() is not None:
         nodes_state.clear()
         events_log.clear()
         add_event(f"Iniciando cluster ({os_type}) com {numproc} nós | Detector: ID {detectproc}")
+
+        popen_kwargs = {}
+        if os.name != 'nt':
+            # Cria um novo grupo de processos para permitir encerrar o pai e todos os filhos
+            popen_kwargs['start_new_session'] = True
+
         server_process = subprocess.Popen(
-            [python_exec, script_path, '-numproc', numproc, '-detectproc', detectproc]
+            [python_exec, script_path, '-numproc', numproc, '-detectproc', detectproc],
+            **popen_kwargs
         )
         return jsonify({"status": "started", "path_used": script_path})
 
@@ -444,14 +447,16 @@ def stop_server_route():
     global server_process, nodes_state, events_log
     if server_process and server_process.poll() is None:
         if os.name == 'nt':
-            # Encerra o processo principal e todos os processos filhos do multiprocessing no Windows
             subprocess.run(
                 ['taskkill', '/F', '/T', '/PID', str(server_process.pid)],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
         else:
-            server_process.terminate()
+            try:
+                os.killpg(os.getpgid(server_process.pid), signal.SIGTERM)
+            except ProcessLookupError:
+                pass
             server_process.wait()
     nodes_state.clear()
     events_log.clear()

@@ -1,6 +1,7 @@
 import argparse
 import random
 import sys
+import requests
 from multiprocessing import Process, Manager
 from node import run_proc
 
@@ -51,6 +52,22 @@ if __name__ == '__main__':
     for p_id, (ip, port) in ip_addresses_ports.items():
         porta_cliente = port + 10000
         print(f"Nó ID {p_id} | Porta Interna: {port} | Porta CLIENTE: {porta_cliente}")
+        try:
+            requests.post(
+                'http://127.0.0.1:5000/update',
+                json={
+                    'id': p_id,
+                    'status': 'inicializando',
+                    'leader_id': num_of_processes,
+                    'internal_port': port,
+                    'client_port': porta_cliente,
+                    'is_detector': (p_id == detector_process),
+                    'event': f"Nó ID {p_id} criado | Interna: {port} | Cliente: {porta_cliente}"
+                },
+                timeout=0.3
+            )
+        except requests.RequestException:
+            pass
     print("="*55 + "\n")
 
     manager = Manager()

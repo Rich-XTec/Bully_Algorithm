@@ -400,7 +400,7 @@ def run_proc(priority, shared_vars, lock, is_detector):
                                 '): received coordinator message from priority ' + str(shared_vars['coordinator_id']) + \
                                 ' by priority ' + str(priority) + '\n', end='', flush=True, file=debug_file)
                     except socket.timeout:
-                        new_skts[shared_vars['detector_id']].settimeout(None)
+                        new_skts[shared_vars['coordinator_id']].settimeout(None)
                         print('DEBUG lineno(' + str(getframeinfo(currentframe()).lineno) + \
                             '): did not receive coordinator message within time from priority ' + str(shared_vars['coordinator_id']) + \
                             ' by priority ' + str(priority) + '\n', end='', flush=True, file=debug_file)

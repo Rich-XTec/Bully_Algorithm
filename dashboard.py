@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, render_template_string
 from werkzeug.serving import WSGIRequestHandler
 import logging
+import signal
 import time
 import subprocess
 import os
